@@ -208,6 +208,6 @@ app.post('/api/analyze', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 TrustLens backend running on http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 TrustLens backend running on port ${PORT}`);
 });

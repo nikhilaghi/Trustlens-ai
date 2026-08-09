@@ -1,12 +1,12 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { GoogleGenAI } from '@google/genai';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 
@@ -18,65 +18,47 @@ const apiKeys = [
   process.env.GEMINI_API_KEY_5,
 ].filter(Boolean);
 
-const MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
+const MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
 
 if (!apiKeys.length) {
-  console.error('❌ No Gemini API keys found in .env');
+  console.error('❌ No Gemini API keys found in environment variables.');
   process.exit(1);
 }
 
 console.log(`🔑 Loaded ${apiKeys.length} Gemini API key(s)`);
 console.log(`🤖 Gemini model: ${MODEL}`);
 
-app.get('/health', (_req, res) => {
+app.get('/', (_req, res) => {
   res.json({ status: 'ok', service: 'TrustLens AI Backend', model: MODEL });
 });
 
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok', service: 'TrustLens AI Backend', model: MODEL, keysLoaded: apiKeys.length });
+});
+
 const responseSchema = {
-  type: 'OBJECT',
+  type: 'object',
   properties: {
-    score: {
-      type: 'INTEGER',
-      description: 'Fraud risk score from 0 to 100. 0 is lowest risk and 100 is highest risk.',
-    },
-    confidence: {
-      type: 'INTEGER',
-      description: 'Model confidence from 0 to 100 for the risk assessment.',
-    },
-    riskLevel: {
-      type: 'STRING',
-      enum: ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'],
-    },
-    verdict: {
-      type: 'STRING',
-      enum: ['PROCEED', 'VERIFY FURTHER', 'DO NOT ACT'],
-    },
-    summary: {
-      type: 'STRING',
-      description: 'One concise explanation of why the message received this assessment.',
-    },
+    score: { type: 'integer', description: 'Fraud risk score from 0 to 100. 0 is lowest risk and 100 is highest risk.' },
+    confidence: { type: 'integer', description: 'Model confidence from 0 to 100 for the risk assessment.' },
+    riskLevel: { type: 'string', enum: ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] },
+    verdict: { type: 'string', enum: ['PROCEED', 'VERIFY FURTHER', 'DO NOT ACT'] },
+    summary: { type: 'string', description: 'One concise explanation of why the message received this assessment.' },
     signals: {
-      type: 'ARRAY',
-      minItems: 3,
-      maxItems: 5,
+      type: 'array', minItems: 3, maxItems: 5,
       items: {
-        type: 'OBJECT',
+        type: 'object',
         properties: {
-          title: { type: 'STRING' },
-          description: { type: 'STRING' },
-          category: { type: 'STRING' },
-          severity: { type: 'STRING', enum: ['critical', 'warning', 'success', 'info'] },
-          confidence: { type: 'INTEGER' },
+          title: { type: 'string' },
+          description: { type: 'string' },
+          category: { type: 'string' },
+          severity: { type: 'string', enum: ['critical', 'warning', 'success', 'info'] },
+          confidence: { type: 'integer' },
         },
         required: ['title', 'description', 'category', 'severity', 'confidence'],
       },
     },
-    recommendation: {
-      type: 'ARRAY',
-      minItems: 2,
-      maxItems: 5,
-      items: { type: 'STRING' },
-    },
+    recommendation: { type: 'array', minItems: 2, maxItems: 5, items: { type: 'string' } },
   },
   required: ['score', 'confidence', 'riskLevel', 'verdict', 'summary', 'signals', 'recommendation'],
 };
@@ -89,14 +71,7 @@ function normaliseResult(raw) {
   const score = clamp(raw.score, 0, 100);
   const confidence = clamp(raw.confidence, 0, 100);
   const riskLevel = String(raw.riskLevel || 'MEDIUM').toUpperCase();
-
-  const verdictMap = {
-    LOW: 'PROCEED',
-    MEDIUM: 'VERIFY FURTHER',
-    HIGH: 'DO NOT ACT',
-    CRITICAL: 'DO NOT ACT',
-  };
-
+  const verdictMap = { LOW: 'PROCEED', MEDIUM: 'VERIFY FURTHER', HIGH: 'DO NOT ACT', CRITICAL: 'DO NOT ACT' };
   const signals = Array.isArray(raw.signals) ? raw.signals.slice(0, 5).map((s, i) => ({
     id: i + 1,
     signalType: ['critical', 'warning', 'success', 'info'].includes(s.severity) ? s.severity : (riskLevel === 'CRITICAL' || riskLevel === 'HIGH' ? 'critical' : 'warning'),
@@ -105,11 +80,8 @@ function normaliseResult(raw) {
     description: String(s.description || 'The AI identified a potentially relevant risk indicator in the submitted communication.'),
     confidence: clamp(s.confidence, 0, 100),
   })) : [];
-
   return {
-    score,
-    confidence,
-    riskLevel,
+    score, confidence, riskLevel,
     verdict: ['PROCEED', 'VERIFY FURTHER', 'DO NOT ACT'].includes(raw.verdict) ? raw.verdict : verdictMap[riskLevel],
     summary: String(raw.summary || 'The AI identified risk indicators in the submitted communication.'),
     signals,
@@ -141,67 +113,40 @@ ${message}
 }
 
 async function callGemini(apiKey, message) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(MODEL)}:generateContent?key=${encodeURIComponent(apiKey)}`;
-
-  const body = {
-    contents: [{ role: 'user', parts: [{ text: buildPrompt(message) }] }],
-    generationConfig: {
+  const ai = new GoogleGenAI({ apiKey });
+  const response = await ai.models.generateContent({
+    model: MODEL,
+    contents: buildPrompt(message),
+    config: {
       temperature: 0.2,
       responseMimeType: 'application/json',
       responseSchema,
     },
-  };
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
   });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    const err = new Error(data?.error?.message || `Gemini API error ${response.status}`);
-    err.status = response.status;
-    throw err;
-  }
-
-  const text = data?.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('').trim();
+  const text = response?.text?.trim();
   if (!text) throw new Error('Gemini returned an empty response.');
-
   return JSON.parse(text);
 }
 
 app.post('/api/analyze', async (req, res) => {
   try {
     const message = String(req.body?.message || '').trim();
-
-    if (!message) {
-      return res.status(400).json({ error: 'message is required' });
-    }
+    if (!message) return res.status(400).json({ error: 'message is required' });
 
     let lastError = null;
-
     for (let i = 0; i < apiKeys.length; i++) {
       try {
         const raw = await callGemini(apiKeys[i], message);
         const result = normaliseResult(raw);
-
         console.log(`✅ Gemini analysis succeeded with key ${i + 1}: ${result.riskLevel} / ${result.score}`);
         return res.json(result);
       } catch (error) {
         lastError = error;
         console.error(`⚠️ Gemini key ${i + 1} failed: ${error.message}`);
-
-        // Rotate through keys for quota/rate-limit/auth/model errors.
-        if (![400, 401, 403, 404, 429, 500, 503].includes(error.status)) break;
       }
     }
 
-    return res.status(502).json({
-      error: 'AI analysis failed',
-      details: lastError?.message || 'Unknown Gemini API error',
-    });
+    return res.status(502).json({ error: 'AI analysis failed', details: lastError?.message || 'All Gemini API keys failed.' });
   } catch (error) {
     console.error('❌ Analysis route error:', error);
     return res.status(500).json({ error: 'AI analysis failed', details: error.message });

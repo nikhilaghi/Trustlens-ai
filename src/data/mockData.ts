@@ -918,14 +918,42 @@ export const PLATFORM_CAPABILITIES = [
     subtitle: 'Planned Expansions',
     description:
       'The following integrations represent planned capabilities once regulatory approvals and technical partnerships are established. Shown here for roadmap visibility.',
-    scope: [
-      { integration: 'SEBI APIs', status: 'Pending Approval', detail: 'Direct API connectivity to SEBI databases' },
-      { integration: 'NSE Feed Integration', status: 'In Discussion', detail: 'Real-time corporate action data feed' },
-      { integration: 'BSE Announcements', status: 'In Discussion', detail: 'Automated circular ingestion pipeline' },
-      { integration: 'Browser Extension', status: 'Planned', detail: 'Real-time page-level fraud detection' },
-      { integration: 'Mobile SDK', status: 'Planned', detail: 'In-app message verification for brokers' },
-      { integration: 'Email Gateway Plugin', status: 'Planned', detail: 'Enterprise email server integration' },
-      { integration: 'WhatsApp Business API', status: 'Concept Stage', detail: 'Incoming message pre-screening' },
-    ],
+scope: [
+  {
+    integration: 'SEBI APIs',
+    status: 'Planned Integration',
+    detail: 'Authorised API connectivity to SEBI data sources, subject to access',
+  },
+  {
+    integration: 'NSE Feed Integration',
+    status: 'Future Integration',
+    detail: 'Exchange data integration for corporate actions',
+  },
+  {
+    integration: 'BSE Announcements',
+    status: 'Future Integration',
+    detail: 'Automated ingestion of exchange-published announcements',
+  },
+  {
+    integration: 'Browser Extension',
+    status: 'Future Integration',
+    detail: 'Real-time page-level fraud detection',
+  },
+  {
+    integration: 'Mobile SDK',
+    status: 'Future Integration',
+    detail: 'In-app message verification for brokers',
+  },
+  {
+    integration: 'Email Gateway Plugin',
+    status: 'Future Integration',
+    detail: 'Enterprise email server integration',
+  },
+  {
+    integration: 'WhatsApp Business API',
+    status: 'Concept Stage',
+    detail: 'Incoming message pre-screening',
+  },
+],
   },
 ];

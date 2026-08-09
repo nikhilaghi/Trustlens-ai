@@ -16,9 +16,25 @@ import {
 } from 'lucide-react';
 import { DEMO_SCENARIOS, ANALYSIS_PIPELINE_STEPS } from '../data/mockData';
 
-type Signal = typeof DEMO_SCENARIOS[0]['detectionSignals'][0];
+type Signal = {
+  id: number;
+  signalType: 'critical' | 'warning' | 'success' | 'info';
+  category: string;
+  title: string;
+  description: string;
+  confidence: number;
+};
 
-// --- Signal Icon Config ---
+type AIResult = {
+  score: number;
+  confidence: number;
+  riskLevel: string;
+  verdict: string;
+  summary: string;
+  signals: Signal[];
+  recommendation: string[];
+};
+
 const SIGNAL_STYLES: Record<Signal['signalType'], { bg: string; border: string; iconBg: string; iconColor: string; icon: typeof CheckCircle2 }> = {
   critical: { bg: 'bg-red-50', border: 'border-red-100', iconBg: 'bg-red-100', iconColor: 'text-red-600', icon: XCircle },
   warning: { bg: 'bg-amber-50', border: 'border-amber-100', iconBg: 'bg-amber-100', iconColor: 'text-amber-600', icon: AlertTriangle },
@@ -71,7 +87,7 @@ function PipelineAnimation({ running, currentStep }: { running: boolean; current
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
               <Loader2 size={16} className="text-blue-400 animate-spin" />
-              <span className="text-[13px] font-bold text-white">AI Analysis Pipeline (Demo Simulation)</span>
+              <span className="text-[13px] font-bold text-white">AI Analysis Pipeline</span>
             </div>
             <span className="text-[11px] text-slate-400">Step {Math.min(currentStep + 1, ANALYSIS_PIPELINE_STEPS.length)} / {ANALYSIS_PIPELINE_STEPS.length}</span>
           </div>
@@ -109,40 +125,65 @@ export default function DetectionEngine() {
   const [currentPipelineStep, setCurrentPipelineStep] = useState(-1);
   const [showResult, setShowResult] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [aiResult, setAiResult] = useState<AIResult | null>(null);
+  const [error, setError] = useState('');
 
   const scenario = DEMO_SCENARIOS[selectedScenarioIdx];
+  const content = inputText.trim() || scenario.fullContent;
 
   const handleScenarioChange = (idx: number) => {
     setSelectedScenarioIdx(idx);
     setInputText('');
     setShowResult(false);
+    setAiResult(null);
+    setError('');
     setDropdownOpen(false);
   };
 
-  const handleAnalyze = () => {
+  const handleAnalyze = async () => {
     if (isAnalyzing) return;
     setShowResult(false);
+    setAiResult(null);
+    setError('');
     setIsAnalyzing(true);
-    setCurrentPipelineStep(-1);
+    setCurrentPipelineStep(0);
 
     let step = 0;
     const interval = setInterval(() => {
       step++;
-      setCurrentPipelineStep(step - 1);
-      if (step >= ANALYSIS_PIPELINE_STEPS.length) {
-        clearInterval(interval);
-        setTimeout(() => {
-          setIsAnalyzing(false);
-          setShowResult(true);
-        }, 300);
-      }
-    }, 220);
+      setCurrentPipelineStep(Math.min(step, ANALYSIS_PIPELINE_STEPS.length - 1));
+    }, 450);
+
+    try {
+      const response = await fetch('http://localhost:5000/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: content }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.details || data?.error || 'AI analysis failed');
+
+      setAiResult(data);
+      setCurrentPipelineStep(ANALYSIS_PIPELINE_STEPS.length - 1);
+      await new Promise(resolve => setTimeout(resolve, 350));
+      setShowResult(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not connect to the AI backend.');
+    } finally {
+      clearInterval(interval);
+      setIsAnalyzing(false);
+      setCurrentPipelineStep(-1);
+    }
   };
+
+  const result = aiResult;
+  const score = result?.score ?? 0;
+  const riskLevel = result?.riskLevel ?? 'UNKNOWN';
 
   return (
     <section id="detection" className="py-20 px-6 lg:px-8 bg-white">
       <div className="max-w-screen-2xl mx-auto">
-        {/* Section Header */}
         <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="mb-12">
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-orange-50 border border-orange-200 rounded-full mb-5">
             <Play size={12} className="text-orange-600" />
@@ -150,15 +191,12 @@ export default function DetectionEngine() {
           </div>
           <h2 className="text-3xl lg:text-[34px] font-bold text-[#0F172A] mb-3">Detection Engine</h2>
           <p className="text-[16px] text-slate-500 max-w-2xl">
-            Explore how TrustLens AI analyzes suspicious communications using realistic demo scenarios. Select a scenario
-            and run a simulated analysis to see explainable AI results.
+            Explore how TrustLens AI analyzes suspicious communications using realistic demo scenarios. Select a scenario and run an AI analysis to see explainable risk results.
           </p>
         </motion.div>
 
         <div className="grid xl:grid-cols-5 gap-7">
-          {/* Left Panel */}
           <div className="xl:col-span-2 space-y-5">
-            {/* Scenario Selector */}
             <div className="bg-slate-50/60 border border-slate-200 rounded-2xl p-5">
               <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">Demo Scenario</label>
               <div className="relative">
@@ -174,8 +212,7 @@ export default function DetectionEngine() {
                     <motion.div initial={{ opacity: 0, y: -8, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -8, scale: 0.97 }} className="absolute top-full mt-2 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-xl z-20 overflow-hidden">
                       {DEMO_SCENARIOS.map((s, i) => (
                         <button key={s.id} onClick={() => handleScenarioChange(i)} className={`w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-slate-50 transition-colors ${i === selectedScenarioIdx ? 'bg-blue-50' : ''} ${i < DEMO_SCENARIOS.length - 1 ? 'border-b border-slate-100' : ''}`}>
-                          <span className="text-base flex-shrink-0">{s.typeIndicator}</span>
-                          <div className="min-w-0"><p className="text-[12.5px] font-semibold text-slate-800 truncate">{s.label}</p><p className="text-[11px] text-slate-400">{s.category} · Risk: {s.riskLevel}</p></div>
+                          <span>{s.typeIndicator}</span><div className="min-w-0"><p className="text-[13px] font-semibold text-slate-800 truncate">{s.label}</p><p className="text-[11px] text-slate-400">{s.category}</p></div>
                         </button>
                       ))}
                     </motion.div>
@@ -184,19 +221,17 @@ export default function DetectionEngine() {
               </div>
             </div>
 
-            {/* Text Input */}
             <div className="bg-slate-50/60 border border-slate-200 rounded-2xl p-5">
               <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">Communication Content (Demo)</label>
-              <textarea value={inputText || scenario.fullContent || ''} onChange={(e) => setInputText(e.target.value)} placeholder="Paste sample communication content here..." rows={12} className="w-full text-[12px] text-slate-700 bg-white border border-slate-200 rounded-xl p-4 resize-none focus:outline-none focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB]/20 leading-relaxed font-mono" />
+              <textarea value={inputText || scenario.fullContent} onChange={e => setInputText(e.target.value)} className="w-full min-h-[280px] resize-y bg-white border border-slate-200 rounded-xl p-4 text-[12.5px] leading-relaxed text-slate-700 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100" />
             </div>
 
-            {/* File Upload */}
             <div className="bg-slate-50/60 border border-slate-200 rounded-2xl p-5">
-              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">Evidence Upload (UI Demo)</label>
-              <div className="grid grid-cols-3 gap-2.5">
-                {[{ key: 'video' as const, Icon: Video, label: 'Upload Video', accept: 'video/*' as const }, { key: 'audio' as const, Icon: Mic, label: 'Upload Audio', accept: 'audio/*' as const }, { key: 'image' as const, Icon: Image, label: 'Upload Image', accept: 'image/*' as const }].map(({ key, Icon, label, accept }) => (
-                  <label key={key} className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-dashed cursor-pointer transition-all ${uploads[key] ? 'border-[#2563EB] bg-[#EFF6FF]' : 'border-slate-300 hover:border-slate-400 hover:bg-white'}`}>
-                    <input type="file" accept={accept} className="sr-only" onChange={() => setUploads(prev => ({ ...prev, [key]: true }))} />
+              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">Optional Evidence</label>
+              <div className="grid grid-cols-3 gap-3">
+                {([['video', 'Video', Video], ['audio', 'Audio', Mic], ['image', 'Image', Image]] as const).map(([key, label, Icon]) => (
+                  <label key={key} className="cursor-pointer flex flex-col items-center gap-2 px-3 py-4 bg-white border border-dashed border-slate-200 rounded-xl hover:border-blue-300 transition-colors">
+                    <input type="file" className="hidden" accept={key === 'video' ? 'video/*' : key === 'audio' ? 'audio/*' : 'image/*'} onChange={() => setUploads(prev => ({ ...prev, [key]: true }))} />
                     <Icon size={18} className={uploads[key] ? 'text-[#2563EB]' : 'text-slate-400'} />
                     <span className={`text-[11px] font-semibold text-center ${uploads[key] ? 'text-[#2563EB]' : 'text-slate-400'}`}>{uploads[key] ? '✓ Added' : label}</span>
                   </label>
@@ -204,39 +239,38 @@ export default function DetectionEngine() {
               </div>
             </div>
 
-            {/* Analyze Button */}
             <motion.button onClick={handleAnalyze} disabled={isAnalyzing} className={`w-full flex items-center justify-center gap-2.5 py-4 rounded-xl font-bold text-[14px] shadow-lg transition-all duration-200 ${isAnalyzing ? 'bg-slate-300 cursor-not-allowed text-slate-500' : 'bg-[#0F172A] text-white hover:bg-[#1E293B] hover:-translate-y-0.5 hover:shadow-xl'}`} whileHover={!isAnalyzing ? { scale: 1.01 } : undefined} whileTap={!isAnalyzing ? { scale: 0.99 } : undefined}>
-              {isAnalyzing ? <><Loader2 size={17} className="animate-spin" /> Analyzing...</> : <><Play size={17} /> Run Demo Analysis</>}
+              {isAnalyzing ? <><Loader2 size={17} className="animate-spin" /> Analyzing with Gemini...</> : <><Play size={17} /> Run AI Analysis</>}
             </motion.button>
+            {error && <div className="p-4 rounded-xl border border-red-200 bg-red-50 text-red-700 text-[12px] leading-relaxed"><strong>AI backend error:</strong> {error}</div>}
           </div>
 
-          {/* Right Panel */}
           <div className="xl:col-span-3 space-y-5 min-h-[500px]">
             <PipelineAnimation running={isAnalyzing} currentStep={currentPipelineStep} />
 
             {!isAnalyzing && !showResult && (
               <div className="bg-slate-50/50 border-2 border-dashed border-slate-200 rounded-2xl p-14 flex flex-col items-center justify-center text-center min-h-[350px]">
                 <div className="w-16 h-16 bg-white border border-slate-200 rounded-2xl flex items-center justify-center mb-5 shadow-sm"><Shield size={26} className="text-slate-300" /></div>
-                <h3 className="text-[17px] font-bold text-slate-600 mb-2">Ready for Demo Analysis</h3>
-                <p className="text-[13px] text-slate-400 max-w-sm">Select a demo scenario and click "Run Demo Analysis" to see how TrustLens AI evaluates suspicious communications using explainable AI.</p>
+                <h3 className="text-[17px] font-bold text-slate-600 mb-2">Ready for AI Analysis</h3>
+                <p className="text-[13px] text-slate-400 max-w-sm">Select a demo scenario and run AI analysis to evaluate the communication with Gemini and see distinct explainable risk signals.</p>
               </div>
             )}
 
             <AnimatePresence>
-              {showResult && (
+              {showResult && result && (
                 <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }} className="space-y-5">
-                  {/* Result Header */}
-                  <div className={`${scenario.riskScore >= 70 ? 'bg-red-50 border-red-200' : scenario.riskScore >= 30 ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'} border-2 rounded-2xl p-6`}>
+                  <div className={`${score >= 70 ? 'bg-red-50 border-red-200' : score >= 30 ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'} border-2 rounded-2xl p-6`}>
                     <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
                       <div>
-                        <div className="flex items-center gap-2 mb-2"><span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 bg-black/5 rounded-md">Prototype Result</span></div>
+                        <div className="flex items-center gap-2 mb-2"><span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 bg-black/5 rounded-md">AI Result</span></div>
                         <h3 className="text-xl font-bold text-[#0F172A]">{scenario.label}</h3>
-                        <p className="text-[13px] text-slate-500 mt-1">{scenario.category} · Simulated Demo</p>
+                        <p className="text-[13px] text-slate-500 mt-1">{scenario.category} · Gemini AI Analysis</p>
                       </div>
-                      <RiskBadge score={scenario.riskScore} />
+                      <RiskBadge score={score} />
                     </div>
+                    <p className="text-[13px] text-slate-600 leading-relaxed mb-5">{result.summary}</p>
                     <div className="grid grid-cols-3 gap-3">
-                      {[{ label: 'AI Confidence', value: `${scenario.confidenceScore}%` }, { label: 'Verdict', value: scenario.recommendation.verdict.split('—')[0], highlight: true }, { label: 'Risk Level', value: scenario.riskLevel }].map(({ label, value, highlight }) => (
+                      {[{ label: 'AI Confidence', value: `${result.confidence}%` }, { label: 'Verdict', value: result.verdict, highlight: true }, { label: 'Risk Level', value: riskLevel }].map(({ label, value, highlight }) => (
                         <div key={label} className="bg-white/70 rounded-xl p-3 border border-white/50">
                           <div className="text-[10.5px] text-slate-400 uppercase tracking-wider font-semibold mb-0.5">{label}</div>
                           <div className={`text-[14px] font-bold ${highlight ? 'text-[#0F172A]' : 'text-slate-700'}`}>{value}</div>
@@ -245,30 +279,20 @@ export default function DetectionEngine() {
                     </div>
                   </div>
 
-                  {/* Detection Signals */}
                   <div className="bg-white border border-slate-200 rounded-2xl p-6">
-                    <div className="flex items-center gap-2 mb-5"><Info size={16} className="text-[#2563EB]" /><h4 className="text-[14px] font-bold text-[#0F172A]">Explainable AI — Detection Signals</h4><span className="ml-auto text-[10px] font-semibold px-2 py-0.5 bg-slate-100 text-slate-500 rounded-md">Demo Output</span></div>
-                    <div className="space-y-3">{scenario.detectionSignals.map(signal => <SignalCard key={signal.id} signal={signal} />)}</div>
+                    <div className="flex items-center gap-2 mb-5"><Info size={16} className="text-[#2563EB]" /><h4 className="text-[14px] font-bold text-[#0F172A]">Explainable AI — Detection Signals</h4><span className="ml-auto text-[10px] font-semibold px-2 py-0.5 bg-blue-50 text-blue-600 rounded-md">Live AI Output</span></div>
+                    <div className="space-y-3">{result.signals.map(signal => <SignalCard key={signal.id} signal={signal} />)}</div>
                   </div>
 
-                  {/* Recommendation */}
                   <div className="bg-[#0F172A] rounded-2xl p-6">
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-2"><Shield size={16} className="text-amber-400" /><h4 className="text-[14px] font-bold text-white">AI Recommendation</h4></div>
-                      <span className="text-[10px] font-semibold px-2 py-0.5 bg-white/10 text-slate-400 rounded-md">Simulated Guidance</span>
+                      <span className="text-[10px] font-semibold px-2 py-0.5 bg-white/10 text-slate-400 rounded-md">Gemini Guidance</span>
                     </div>
-                    <ul className="space-y-3 mb-5">{scenario.recommendation.actions.map((action, actionIdx) => (<motion.li key={actionIdx} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4 + actionIdx * 0.08 }} className="flex items-start gap-3"><div className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-2 flex-shrink-0" /><span className="text-[13px] text-slate-200 leading-relaxed">{action}</span></motion.li>))}</ul>
-                    <div className="pt-4 border-t border-white/10"><p className="text-[11.5px] text-slate-500 italic leading-relaxed">{scenario.recommendation.escalationNote}</p></div>
+                    <ul className="space-y-3 mb-5">{result.recommendation.map((action, actionIdx) => (<motion.li key={actionIdx} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4 + actionIdx * 0.08 }} className="flex items-start gap-3"><div className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-2 flex-shrink-0" /><span className="text-[13px] text-slate-200 leading-relaxed">{action}</span></motion.li>))}</ul>
+                    <div className="pt-4 border-t border-white/10"><p className="text-[11.5px] text-slate-500 italic leading-relaxed">AI-generated assessment. External registry, identity and cryptographic checks are separate TrustLens components and are not implied by this language analysis.</p></div>
                     <div className="mt-4 pt-3 border-t border-white/5 flex flex-wrap gap-3">
-                      <a
-  href="https://scores.sebi.gov.in"
-  target="_blank"
-  rel="noopener noreferrer"
-  className="inline-flex items-center gap-1.5 text-[12px] text-blue-400 hover:text-blue-300 hover:underline underline-offset-4 transition-all font-medium"
->
-  <ExternalLink size={12} />
-  Report to SEBI SCORES (External)
-</a>
+                      <a href="https://scores.sebi.gov.in" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-[12px] text-blue-400 hover:text-blue-300 hover:underline underline-offset-4 transition-all font-medium"><ExternalLink size={12} />Report to SEBI SCORES (External)</a>
                     </div>
                   </div>
                 </motion.div>

@@ -91,10 +91,10 @@ export default function PlatformOverview() {
                       <div className="flex-shrink-0 mt-0.5">
                         <div
                           className={`w-2 h-2 rounded-full ${
-                            item.status === 'Pending Approval' ? 'bg-amber-400' :
-                            item.status === 'In Discussion' ? 'bg-blue-400' :
-                            item.status === 'Planned' ? 'bg-violet-400' :
-                            'bg-gray-300'
+                            item.status === 'Planned Integration' ? 'bg-blue-400' :
+item.status === 'Future Integration' ? 'bg-blue-400' :
+item.status === 'Concept Stage' ? 'bg-gray-300' :
+'bg-gray-300'
                           }`}
                         />
                       </div>
@@ -102,10 +102,10 @@ export default function PlatformOverview() {
                         <div className="flex items-center gap-2">
                           <span className="text-[12.5px] font-bold text-[#0F172A]">{item.integration}</span>
                           <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
-                            item.status === 'Pending Approval' ? 'bg-amber-100 text-amber-700' :
-                            item.status === 'In Discussion' ? 'bg-blue-100 text-blue-700' :
-                            item.status === 'Planned' ? 'bg-violet-100 text-violet-700' :
-                            'bg-gray-100 text-gray-600'
+                            item.status === 'Planned Integration' ? 'bg-blue-100 text-blue-700' :
+item.status === 'Future Integration' ? 'bg-blue-100 text-blue-700' :
+item.status === 'Concept Stage' ? 'bg-gray-100 text-gray-600' :
+'bg-gray-100 text-gray-600'
                           }`}>
                             {item.status}
                           </span>

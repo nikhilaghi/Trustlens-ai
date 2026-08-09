@@ -11,11 +11,11 @@ const ARCHITECTURE_FLOW = [
 ];
 
 const FUTURE_INTEGRATIONS = [
-  { icon: Globe, title: 'SEBI APIs', description: 'Direct connectivity for real-time intermediary data validation', status: 'Pending Approval', statusColor: 'bg-amber-100 text-amber-700 border-amber-200' },
-  { icon: Globe, title: 'NSE / BSE Feeds', description: 'Automated ingestion of corporate actions, circulars, announcements', status: 'In Discussion', statusColor: 'bg-blue-100 text-blue-700 border-blue-200' },
-  { icon: Monitor, title: 'Browser Extension', description: 'Real-time page-level fraud detection for users browsing financial sites', status: 'Planned Q4 2026', statusColor: 'bg-violet-100 text-violet-700 border-violet-200' },
-  { icon: Smartphone, title: 'Mobile SDK', description: 'In-app integration enabling brokers to verify messages at reception point', status: 'Planned Q1 2027', statusColor: 'bg-violet-100 text-violet-700 border-violet-200' },
-  { icon: Mail, title: 'Email Gateway Plugin', description: 'Server-side email pre-scanning with TrustLens AI before delivery', status: 'Planned 2027', statusColor: 'bg-slate-100 text-slate-600 border-slate-300' },
+  { icon: Globe, title: 'SEBI APIs', description: 'Direct connectivity for real-time intermediary data validation', status: 'Future Integration', statusColor: 'bg-amber-100 text-amber-700 border-amber-200' },
+  { icon: Globe, title: 'NSE / BSE Feeds', description: 'Automated ingestion of corporate actions, circulars, announcements', status: 'Future Integration', statusColor: 'bg-blue-100 text-blue-700 border-blue-200' },
+  { icon: Monitor, title: 'Browser Extension', description: 'Real-time page-level fraud detection for users browsing financial sites', status: 'Future Integration', statusColor: 'bg-violet-100 text-violet-700 border-violet-200' },
+  { icon: Smartphone, title: 'Mobile SDK', description: 'In-app integration enabling brokers to verify messages at reception point', status: 'Future Integration', statusColor: 'bg-violet-100 text-violet-700 border-violet-200' },
+  { icon: Mail, title: 'Email Gateway Plugin', description: 'Server-side email pre-scanning with TrustLens AI before delivery', status: 'Future Integration', statusColor: 'bg-slate-100 text-slate-600 border-slate-300' },
   { icon: MessageSquare, title: 'WhatsApp Business API', description: 'Incoming message pre-screening for brokers using WhatsApp Business', status: 'Concept Stage', statusColor: 'bg-gray-100 text-gray-600 border-gray-300' },
 ];
 
@@ -55,7 +55,7 @@ export default function SystemArchitecture() {
           <div className="mt-6 p-4 bg-slate-50 rounded-xl border border-slate-200 flex items-start gap-3">
             <CheckCircle2 size={15} className="text-emerald-500 flex-shrink-0 mt-0.5" />
             <p className="text-[13px] text-slate-500 leading-relaxed">
-              <strong>Current State:</strong> This prototype simulates the entire pipeline client-side using hardcoded scenarios. In production, each stage would connect to dedicated microservices, GPU clusters for deepfake analysis, and live SEBI PKI infrastructure.
+              <strong>Current State:</strong> This prototype simulates the entire pipeline client-side using hardcoded scenarios. In production, each stage would connect to dedicated microservices, GPU clusters for deepfake analysis, and authorized regulatory verification infrastructure.
             </p>
           </div>
         </motion.div>
@@ -65,7 +65,7 @@ export default function SystemArchitecture() {
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.15 }} className="mb-8 text-center">
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-violet-50 border border-violet-200 rounded-full mb-4"><Shield size={12} className="text-violet-600" /><span className="text-[11px] font-semibold text-violet-700 uppercase tracking-widest">Future Scope</span></div>
             <h3 className="text-2xl font-bold text-[#0F172A]">Planned Integrations</h3>
-            <p className="text-sm text-slate-500 mt-2 max-w-lg mx-auto">The following integrations represent planned capabilities pending regulatory approvals and technical partnerships.</p>
+            <p className="text-sm text-slate-500 mt-2 max-w-lg mx-auto">The following integrations illustrate the long-term product roadmap and are not implemented in this prototype.</p>
           </motion.div>
 
           <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
